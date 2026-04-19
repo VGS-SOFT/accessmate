@@ -41,16 +41,13 @@ function toSeverity(impact: string | null): Severity {
 export async function runAxeScan(handle: PageHandle, axeScript: string): Promise<Violation[]> {
   const { page } = handle
 
-  await page.evaluate((script) => {
-    const scriptEl = document.createElement('script')
-    scriptEl.textContent = script
-    document.head.appendChild(scriptEl)
-  }, axeScript)
+  // page.evaluate(string) runs raw JS via CDP Runtime.evaluate — bypasses CSP entirely
+  await page.evaluate(axeScript)
 
   const results: AxeResults = await page.evaluate(async () => {
-    return await (
-      window as unknown as { axe: { run: (opts: unknown) => Promise<AxeResults> } }
-    ).axe.run({
+    const w = window as unknown as { axe?: { run: (opts: unknown) => Promise<AxeResults> } }
+    if (!w.axe) throw new Error('axe-core failed to load on the target page')
+    return await w.axe.run({
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
     })
   })
